@@ -26,11 +26,27 @@ namespace AttrKom
         {
             InitializeComponent();
             attrLibraryFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "document_attr.lat");
+
+            // Изначально кнопка недоступна
+            toolStripButton1.Enabled = false;
         }
 
         private void Settings_Click(object sender, EventArgs e)
         {
 
+        }
+
+        private void toolStripButton1_Click(object sender, EventArgs e)
+        {
+            // Передаем текущее значение из toolStripTextBox1 в форму операций
+            string currentValue = toolStripTextBox1.Text ?? "";
+            OperationForm operationForm = new OperationForm(currentValue);
+
+            if (operationForm.ShowDialog() == DialogResult.OK)
+            {
+                // Если форма закрыта с результатом OK, обновляем toolStripTextBox1
+                toolStripTextBox1.Text = operationForm.SelectedCodes;
+            }
         }
 
         private void Write_Click(object sender, EventArgs e)
@@ -55,16 +71,13 @@ namespace AttrKom
                 // Получаем ссылку на 3D документ
                 reference docRef = doc3D.reference;
                 string attrName = textBoxAttr.Text;
-                string newValue = textBoxValue.Text ?? "";
+                string newValue = toolStripTextBox1.Text ?? "";
 
                 // Используем метод записи атрибута
                 bool success = SetDocumentAttribute(docRef, attrName, newValue);
 
                 if (success)
                 {
-                    MessageBox.Show($"Значение атрибута '{attrName}' успешно обновлено на '{newValue}'!",
-                        "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
                     // Обновляем отображение в DataGridView
                     if (DataGridview != null)
                     {
@@ -141,13 +154,6 @@ namespace AttrKom
                 // Получаем все существующие атрибуты документа
                 Dictionary<string, string> existingAttributes = GetDocumentAttributes(docRef);
 
-                // Диагностика: выводим количество найденных атрибутов
-                System.Diagnostics.Debug.WriteLine($"Найдено атрибутов в документе: {existingAttributes.Count}");
-                foreach (var kvp in existingAttributes)
-                {
-                    System.Diagnostics.Debug.WriteLine($"  Атрибут: '{kvp.Key}' = '{kvp.Value}'");
-                }
-
                 // Сначала создаём недостающие атрибуты
                 bool attributesCreated = false;
                 foreach (var row in rows.Items)
@@ -155,7 +161,6 @@ namespace AttrKom
                     // Проверяем, есть ли атрибут в модели
                     if (!existingAttributes.ContainsKey(row.AttrName))
                     {
-                        System.Diagnostics.Debug.WriteLine($"Создаём атрибут: '{row.AttrName}'");
                         // Атрибута нет в модели - создаём пустой
                         CreateEmptyAttribute(docRef, row.AttrName);
                         attributesCreated = true;
@@ -165,9 +170,7 @@ namespace AttrKom
                 // Если были созданы новые атрибуты, перечитываем список
                 if (attributesCreated)
                 {
-                    System.Diagnostics.Debug.WriteLine("Перечитываем атрибуты после создания новых...");
                     existingAttributes = GetDocumentAttributes(docRef);
-                    System.Diagnostics.Debug.WriteLine($"После перечитывания найдено атрибутов: {existingAttributes.Count}");
                 }
 
                 // Заполняем DataGridView строками из XML с их значениями
@@ -179,11 +182,6 @@ namespace AttrKom
                     if (existingAttributes.ContainsKey(row.AttrName))
                     {
                         attrValue = existingAttributes[row.AttrName];
-                        System.Diagnostics.Debug.WriteLine($"Добавляем в DGV: '{row.AttrName}' = '{attrValue}'");
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine($"ВНИМАНИЕ: Атрибут '{row.AttrName}' не найден в словаре!");
                     }
 
                     DataGridview.Rows.Add(row.AttrName, attrValue);
@@ -231,7 +229,11 @@ namespace AttrKom
         // Универсальная функция обновления текстбоксов по текущей строке
         private void UpdateTextBoxesFromCurrentRow()
         {
-            if (DataGridview == null) return;
+            if (DataGridview == null)
+            {
+                toolStripButton1.Enabled = false;
+                return;
+            }
 
             DataGridViewRow currentRow = null;
 
@@ -246,7 +248,8 @@ namespace AttrKom
             if (currentRow == null)
             {
                 textBoxAttr.Text = "";
-                textBoxValue.Text = "";
+                toolStripTextBox1.Text = "";
+                toolStripButton1.Enabled = false;
                 return;
             }
 
@@ -254,8 +257,12 @@ namespace AttrKom
             var attrCell = currentRow.Cells["Attr"];
             var valCell = currentRow.Cells["Value"];
 
-            textBoxAttr.Text = attrCell?.Value?.ToString() ?? "";
-            textBoxValue.Text = valCell?.Value?.ToString() ?? "";
+            string attrValue = attrCell?.Value?.ToString() ?? "";
+            textBoxAttr.Text = attrValue;
+            toolStripTextBox1.Text = valCell?.Value?.ToString() ?? "";
+
+            // Включаем кнопку только если выбран атрибут "Технологический маршрут"
+            toolStripButton1.Enabled = (attrValue == "Технологический маршрут");
         }
 
         // Подключение к KOMPAS
@@ -312,8 +319,6 @@ namespace AttrKom
                             double attrTypeNum = 0;
                             attr.ksGetAttrKeysInfo(pAttr, out k1, out k2, out k3, out k4, out attrTypeNum);
 
-                            System.Diagnostics.Debug.WriteLine($"Проверка атрибута с ключами: k1={k1}, k2={k2}, k3={k3}, k4={k4}, typeNum={attrTypeNum}");
-
                             // Получаем тип атрибута для извлечения имени
                             ksAttributeTypeParam type = (ksAttributeTypeParam)kompas.GetParamStruct((short)StructType2DEnum.ko_AttributeType);
                             if (type != null)
@@ -321,17 +326,14 @@ namespace AttrKom
                                 type.Init();
                                 // Получаем информацию о типе атрибута
                                 int getTypeResult = attr.ksGetAttrType(attrTypeNum, attrLibraryFile, type);
-                                System.Diagnostics.Debug.WriteLine($"  ksGetAttrType вернул: {getTypeResult}");
 
                                 if (getTypeResult == 1)
                                 {
                                     string currentAttrName = type.header;
-                                    System.Diagnostics.Debug.WriteLine($"  Имя атрибута: '{currentAttrName}'");
 
                                     if (currentAttrName == attrName)
                                     {
-                                        // Нашли нужный атрибут - записываем новое значение (аналогично CreateDocumentAttribute)
-                                        System.Diagnostics.Debug.WriteLine($"  Найден атрибут '{attrName}', записываем значение '{attrValue}'");
+                                        // Нашли нужный атрибут - записываем новое значение
 
                                         // Создаем параметры для записи (аналогично DocumentAttributeForm.cs:203-215)
                                         ksUserParam usPar = (ksUserParam)kompas.GetParamStruct((short)StructType2DEnum.ko_UserParam);
@@ -351,19 +353,16 @@ namespace AttrKom
 
                                             // Записываем значение атрибута (строка 0, столбец 0)
                                             int setRowResult = attr.ksSetAttrRow(pAttr, 0, 0, 0, usPar, string.Empty);
-                                            System.Diagnostics.Debug.WriteLine($"  ksSetAttrRow вернул: {setRowResult}");
 
                                             // Очищаем массив значений
                                             valueArr.ksDeleteArray();
 
                                             if (setRowResult == 1)
                                             {
-                                                System.Diagnostics.Debug.WriteLine($"  Успешно записано значение '{attrValue}' в атрибут '{attrName}'");
                                                 return true;
                                             }
                                             else
                                             {
-                                                System.Diagnostics.Debug.WriteLine($"  Ошибка записи значения в атрибут '{attrName}'");
                                                 return false;
                                             }
                                         }
@@ -373,9 +372,9 @@ namespace AttrKom
                                 }
                             }
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
-                            System.Diagnostics.Debug.WriteLine($"Ошибка при обработке атрибута: {ex.Message}");
+                            // Игнорируем ошибки при обработке отдельного атрибута
                         }
 
                         // Переходим к следующему атрибуту
@@ -384,12 +383,10 @@ namespace AttrKom
                     }
                 }
 
-                System.Diagnostics.Debug.WriteLine($"Атрибут '{attrName}' не найден в документе");
                 return false;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Ошибка при записи атрибута: {ex.Message}");
                 MessageBox.Show(string.Format("Ошибка при записи атрибута:\n{0}", ex.Message),
                     "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return false;
@@ -439,8 +436,6 @@ namespace AttrKom
                             double attrTypeNum = 0;
                             attr.ksGetAttrKeysInfo(pAttr, out k1, out k2, out k3, out k4, out attrTypeNum);
 
-                            System.Diagnostics.Debug.WriteLine($"Найден атрибут с ключами: k1={k1}, k2={k2}, k3={k3}, typeNum={attrTypeNum}");
-
                             // Получаем тип атрибута для извлечения имени
                             ksAttributeTypeParam type = (ksAttributeTypeParam)kompas.GetParamStruct((short)StructType2DEnum.ko_AttributeType);
                             if (type != null)
@@ -448,37 +443,29 @@ namespace AttrKom
                                 type.Init();
                                 // Получаем информацию о типе атрибута
                                 int getTypeResult = attr.ksGetAttrType(attrTypeNum, attrLibraryFile, type);
-                                System.Diagnostics.Debug.WriteLine($"  ksGetAttrType вернул: {getTypeResult}");
 
                                 if (getTypeResult == 1)
                                 {
                                     string attrName = type.header;
-                                    System.Diagnostics.Debug.WriteLine($"  Имя атрибута: '{attrName}'");
 
                                     if (!string.IsNullOrEmpty(attrName))
                                     {
-                                        // Читаем строку атрибута (аналогично DocumentAttributeForm.cs:315)
+                                        // Читаем строку атрибута
                                         string attrValue = "";
-                                        int getRowResult = attr.ksGetAttrRow(pAttr, 0, 0, 0, usPar);
-                                        System.Diagnostics.Debug.WriteLine($"  ksGetAttrRow вернул: {getRowResult}");
+                                        attr.ksGetAttrRow(pAttr, 0, 0, 0, usPar);
 
-                                        // ВАЖНО: Получаем массив ПОСЛЕ чтения (аналогично DocumentAttributeForm.cs:318)
+                                        // ВАЖНО: Получаем массив ПОСЛЕ чтения
                                         ksDynamicArray readArr = (ksDynamicArray)usPar.GetUserArray();
 
                                         if (readArr != null && readArr.ksGetArrayCount() > 0)
                                         {
-                                            int arrCount = readArr.ksGetArrayCount();
-                                            System.Diagnostics.Debug.WriteLine($"  Количество элементов в массиве: {arrCount}");
-
                                             // Получаем значение из первой колонки
                                             item.Init();
                                             int getItemResult = readArr.ksGetArrayItem(0, item);
-                                            System.Diagnostics.Debug.WriteLine($"  ksGetArrayItem вернул: {getItemResult}");
 
                                             if (getItemResult == 1)
                                             {
                                                 attrValue = item.strVal ?? "";
-                                                System.Diagnostics.Debug.WriteLine($"  Значение: '{attrValue}'");
                                             }
                                         }
 
@@ -486,15 +473,14 @@ namespace AttrKom
                                         if (!attributes.ContainsKey(attrName))
                                         {
                                             attributes.Add(attrName, attrValue);
-                                            System.Diagnostics.Debug.WriteLine($"  Добавлено в словарь: '{attrName}' = '{attrValue}'");
                                         }
                                     }
                                 }
                             }
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
-                            System.Diagnostics.Debug.WriteLine($"Ошибка при чтении атрибута: {ex.Message}");
+                            // Игнорируем ошибки при чтении отдельного атрибута
                         }
 
                         // Переходим к следующему атрибуту
@@ -557,7 +543,6 @@ namespace AttrKom
 
                         // Создаем тип атрибута
                         double numbType = attr.ksCreateAttrType(type, attrLibraryFile);
-                        System.Diagnostics.Debug.WriteLine($"Создание типа атрибута '{attrName}': numbType={numbType}");
 
                         if (numbType > 0)
                         {
@@ -595,8 +580,7 @@ namespace AttrKom
                                     fVisibl.ksAddArrayItem(-1, item);
 
                                     // Создаем атрибут документа
-                                    reference attrRef = attr.ksCreateAttr(docRef, attrPar, numbType, attrLibraryFile);
-                                    System.Diagnostics.Debug.WriteLine($"Создание атрибута '{attrName}': attrRef={attrRef}");
+                                    attr.ksCreateAttr(docRef, attrPar, numbType, attrLibraryFile);
 
                                     valueArr.ksDeleteArray();
                                 }

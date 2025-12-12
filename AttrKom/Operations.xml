@@ -1,0 +1,9 @@
+<Operations>
+  <Operation Name="Лазерная резка" Code="LR-001" />
+  <Operation Name="Гибка" Code="GB-002" />
+  <Operation Name="Сварочные работы" Code="SW-003" />
+  <Operation Name="Слесарные работы" Code="SL-004" />
+  <Operation Name="Покраска" Code="PK-005" />
+  <Operation Name="Сборка" Code="SB-006" />
+  <Operation Name="Упаковка" Code="UP-007" />
+</Operations>
