@@ -1,0 +1,25 @@
+<Rows>
+  <Row AttrName="Обозначение" />
+  <Row AttrName="Наименование" />
+  <Row AttrName="Кол-во" />
+  <Row AttrName="Раздел спецификации" />
+  <Row AttrName="Материал" />
+  <Row AttrName="Масса" />
+  <Row AttrName="Пуансон" />
+  <Row AttrName="Матрица" />
+  <Row AttrName="Кол-во гибов" />
+  <Row AttrName="Узел-1" />
+  <Row AttrName="Узел верхний" />
+  <Row AttrName="Путь до файла" />
+  <Row AttrName="Путь до DXF" />
+  <Row AttrName="Габаритные размеры" />
+  <Row AttrName="Покрытие" />
+  <Row AttrName="Сварочные работы" />
+  <Row AttrName="Слесарные работы" />
+  <Row AttrName="Примечание" />
+  <Row AttrName="Площадь поверхности" />
+  <Row AttrName="Код СИ" />
+  <Row AttrName="Код Мат" />
+  <Row AttrName="Время резки" />
+  <Row AttrName="Технологический маршрут" />
+</Rows>
